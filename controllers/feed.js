@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 
 const Post = require('../models/post');
+const User = require('../models/user');
 const { throwErr, deleteImage } = require('../util/utility');
 
 exports.getPosts = (req, res, next) => {
@@ -31,6 +32,7 @@ exports.createPost = (req, res, next) => {
     if(!errors.isEmpty()) {
         const error = new Error('Validation failed, entered data is incorrect');
         error.statusCode = 422;
+        error.data = errors.array();
         throw error;
 // integrated with a better way via a middleware in the app.js 
         // return res.status(422).json({
@@ -47,18 +49,28 @@ exports.createPost = (req, res, next) => {
     const imageUrl = req.file.path;
     const title = req.body.title;
     const content = req.body.content;
+    let creator;
     const post = new Post({
             title: title,
             content: content,
             imageUrl: imageUrl,
-            creator: { name: 'mayank'}
+            creator: req.userId
     });
     
     post.save()
     .then(result => {
+            return User.findById(req.userId);
+    })
+    .then(user => {
+        creator = user;
+        user.posts.push(post);
+        return user.save();
+    })
+    .then(result => {
         res.status(201).json({
             message: 'Post created successfully!',
-            post: result
+            post: post,
+            creator : { _id: creator._id, nam: creator.name }
         });
     })
     .catch(err => {
@@ -90,6 +102,7 @@ exports.updatePost = (req, res, next) => {
     if(!errors.isEmpty()) {
         const error = new Error('Validation failed, entered data is incorrect');
         error.statusCode = 422;
+        error.data = errors.array();
         throw error;
     };
     
@@ -111,6 +124,11 @@ exports.updatePost = (req, res, next) => {
         if(!post) {
             const error = new Error('Could not find post.');
             error.statusCode = 404;
+            throw error;
+        }
+        if(post.creator.toString() !== req.userId) {
+            const error = new Error('Not authorized');
+            error.statusCode = 403;
             throw error;
         }
         if(imageUrl !== post.imageUrl) {
@@ -141,8 +159,20 @@ exports.deletePost = (req, res, next) => {
             error.statusCode = 404;
             throw error;
         }
+        if(post.creator.toString() !== req.userId) {
+            const error = new Error('Not authorized');
+            error.statusCode = 403;
+            throw error;
+        }
         deleteImage(post.imageUrl);
         return Post.findByIdAndRemove(postId);
+    })
+    .then(result => {
+        return User.findById(req.userId);
+    })
+    .then(user => {
+        user.posts.pull(postId);
+        return user.save();
     })
     .then(result => {
         res.status(200).json({
