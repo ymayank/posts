@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.get('/posts', isAuth, feedController.getPosts);
 
-router.post('/posts', isAuth, validator.validateCreateUser(), feedController.createPost);
+router.post('/posts', isAuth, validator.validateUpdatePost(), feedController.createPost);
 
 router.get('/post/:postId', isAuth, feedController.getPost)
 
