@@ -58,6 +58,10 @@ app.use((error, req, res, next) => {
 });
 
 connectDB(() => {
-    app.listen(PORT);
+    const server = app.listen(PORT);
+    const io = require('./util/socket').init(server);
+    io.on('connection', socket => {
+        console.log('client connected');
+    });
     console.log(`Node server listening on port: ${PORT}`);
 });

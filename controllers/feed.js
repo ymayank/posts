@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 
+const io = require('../util/socket');
 const Post = require('../models/post');
 const User = require('../models/user');
 const { throwErr, deleteImage } = require('../util/utility');
@@ -63,10 +64,14 @@ exports.createPost = (req, res, next) => {
         return user.save();
     })
     .then(result => {
+        io.getIO().emit('posts', { 
+            action : 'create',
+            post: {...post._doc, creator : {_id: req.userId, name: creator.name}}
+        });
         res.status(201).json({
             message: 'Post created successfully!',
             post: post,
-            creator : { _id: creator._id, nam: creator.name }
+            creator : { _id: creator._id, name: creator.name }
         });
     })
     .catch(err => {
@@ -115,7 +120,7 @@ exports.updatePost = (req, res, next) => {
         throw error;
     }
     
-    Post.findById(postId)
+    Post.findById(postId).populate('creator')
     .then(post => {
         if(!post) {
             const error = new Error('Could not find post.');
@@ -136,6 +141,10 @@ exports.updatePost = (req, res, next) => {
         return post.save();
     })
     .then(result => {
+        io.getIO().emit('posts', { 
+            action: 'update',
+            post: result
+        });
         res.status(200).json({
             message: 'Post updated!',
             post: result
@@ -171,6 +180,10 @@ exports.deletePost = (req, res, next) => {
         return user.save();
     })
     .then(result => {
+        io.getIO().emit('posts', { 
+            action: 'delete',
+            post: postId
+        });
         res.status(200).json({
             message: 'post deleted'
         })
